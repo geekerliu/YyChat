@@ -6,6 +6,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.graphics.drawable.AnimationDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,34 +16,52 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.dasudian.chat.adapter.MessageAdapter;
+import com.dasudian.utils.CommonUtils;
+import com.dasudian.utils.voice.AudioPlayer;
+import com.dasudian.utils.voice.VoiceRecoder;
 
 public class ChatActivity extends Activity implements OnClickListener {
-
+	// 从图库选择图片
 	public static final int REQUEST_CODE_LOCAL = 2;
 
 	private final String TAG = "ChatActivity";
 	private RelativeLayout edittextLayout;
 	private LinearLayout moreLayout;
 	private Button buttonSetModeKeyboard;
+	// 发送消息按钮
 	private Button buttonSend;
+	// +号按钮
 	private Button buttonMore;
 	private LinearLayout linearLayoutPressToSpeak;
+	// 输入聊天内容的EditText
 	private EditText editTextContent;
 	private Button buttonSetModeVoice;
 	private ListView listView;
 	private MessageAdapter adapter;
+	// 麦克风
+	private ImageView micImage;
+	private AnimationDrawable animationDrawable;
+	// 语音输入按钮上的提示文字
+	private TextView recordingHint;
+	// 语音显示布局
+	private View recordingContainer;
+	private AudioPlayer audioPlayer = new AudioPlayer();
+	private VoiceRecoder voiceRecoder;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +75,8 @@ public class ChatActivity extends Activity implements OnClickListener {
 		super.onActivityResult(requestCode, resultCode, data);
 		if (resultCode == RESULT_OK) {
 			if (requestCode == REQUEST_CODE_LOCAL && data != null) {
+				// 选完图片后隐藏选择布局
+				moreLayout.setVisibility(View.GONE);
 				Uri selectedImage = data.getData();
 				if (selectedImage != null) {
 					sendImageByUri(selectedImage);
@@ -71,10 +93,16 @@ public class ChatActivity extends Activity implements OnClickListener {
 		buttonSetModeKeyboard = (Button) findViewById(R.id.btn_set_mode_keyboard);
 		buttonSend = (Button) findViewById(R.id.btn_send);
 		buttonMore = (Button) findViewById(R.id.btn_more);
+		micImage = (ImageView) findViewById(R.id.mic_image);
+		animationDrawable = (AnimationDrawable) micImage.getBackground();
+		animationDrawable.setOneShot(false);
 		linearLayoutPressToSpeak = (LinearLayout) findViewById(R.id.ll_press_to_speak);
+		linearLayoutPressToSpeak.setOnTouchListener(new PressToSpeakListener());
+		recordingHint = (TextView) findViewById(R.id.recording_hint);
 		buttonSetModeVoice = (Button) findViewById(R.id.btn_set_mode_voice);
+		recordingContainer = findViewById(R.id.view_talk);
 		listView = (ListView) findViewById(R.id.lv_chat);
-		adapter = new MessageAdapter(this);
+		adapter = new MessageAdapter(this, this);
 		listView.setAdapter(adapter);
 
 		editTextContent.setOnClickListener(new OnClickListener() {
@@ -113,6 +141,81 @@ public class ChatActivity extends Activity implements OnClickListener {
 		findViewById(R.id.view_photo).setOnClickListener(this);
 		findViewById(R.id.view_camera).setOnClickListener(this);
 		findViewById(R.id.view_file).setOnClickListener(this);
+	}
+
+	/**
+	 * 按住说话listener
+	 */
+	class PressToSpeakListener implements View.OnTouchListener {
+		@Override
+		public boolean onTouch(View v, MotionEvent event) {
+			switch (event.getAction()) {
+			case MotionEvent.ACTION_DOWN:
+				animationDrawable.start();
+				if (!CommonUtils.isExitsSdcard()) {
+					Toast.makeText(ChatActivity.this, "发送语音需要sdcard支持",
+							Toast.LENGTH_SHORT).show();
+					return false;
+				}
+				v.setPressed(true);
+				
+				// TODO 如果此时正在播放语音，先停止语音播放
+				if (audioPlayer != null) {
+					audioPlayer.stop();
+				}
+				
+				// 显示说话的布局
+				recordingContainer.setVisibility(View.VISIBLE);
+				recordingHint.setText("手指上滑，取消发送");
+				recordingHint.setBackgroundColor(Color.TRANSPARENT);
+				
+				// TODO 开始录音
+				Log.d(TAG, "voiceRecoder.start()");
+				voiceRecoder = new VoiceRecoder("dasudian", ChatActivity.this);
+				voiceRecoder.start();
+				
+				return true;
+			case MotionEvent.ACTION_MOVE:
+				if (event.getY() < 0) {
+					recordingHint.setText("松开手指，取消发送");
+					recordingHint
+							.setBackgroundResource(R.drawable.recording_text_hint_bg);
+				} else {
+					recordingHint.setText("手指上滑，取消发送");
+					recordingHint.setBackgroundColor(Color.TRANSPARENT);
+					animationDrawable.start();
+				}
+				return true;
+			case MotionEvent.ACTION_UP:
+				if (animationDrawable.isRunning()) {
+					animationDrawable.stop();
+				}
+				v.setPressed(false);
+				recordingContainer.setVisibility(View.INVISIBLE);
+				if (event.getY() < 0) {
+					// TODO 丢弃这次录音
+					if (voiceRecoder != null) {
+						Log.d(TAG, "voiceRecoder.discard()");
+						voiceRecoder.discard();
+					}
+				} else {
+					// TODO 停止录音并发送录音文件
+					if (voiceRecoder != null) {
+						Log.d(TAG, "voiceRecoder.stop()");
+						voiceRecoder.stop();
+					}
+				}
+				return true;
+			default:
+				recordingContainer.setVisibility(View.INVISIBLE);
+				// TODO 丢弃这次录音
+				if (voiceRecoder != null) {
+					Log.d(TAG, "voiceRecoder.discard()");
+					voiceRecoder.discard();
+				}
+				return false;
+			}
+		}
 	}
 
 	/**

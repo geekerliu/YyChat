@@ -2,10 +2,13 @@ package com.dasudian.utils;
 
 import java.lang.reflect.Field;
 
+import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapFactory.Options;
+import android.graphics.drawable.BitmapDrawable;
 import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.ImageView;
 
@@ -125,6 +128,43 @@ public class ImageSizeUtil {
 		options.inJustDecodeBounds = false;
 		Bitmap bitmap = BitmapFactory.decodeFile(path, options);
 		return bitmap;
+	}
+	
+	/**
+	 * 从本地获取BitmapDrawable，并把它缩放为当前屏幕的大小
+	 * @param a
+	 * @param path
+	 * @return
+	 */
+	public static BitmapDrawable getScaledBitmapDrawable(Activity a, String path) {
+		Display display = a.getWindowManager().getDefaultDisplay();
+		// 获取屏幕宽高
+		float destWidth = display.getWidth();
+		float destHeight = display.getHeight();
+		
+		// 读取磁盘上图片的外形尺寸
+		BitmapFactory.Options options = new BitmapFactory.Options();
+		// 设置仅仅返回尺寸
+		options.inJustDecodeBounds = true;
+		BitmapFactory.decodeFile(path, options);
+		
+		float srcWidth = options.outWidth;
+		float srcHeight = options.outHeight;
+		
+		int inSampleSize = 1;
+		if (srcHeight > destHeight || srcWidth > destWidth) {
+			if (srcWidth > srcHeight) {
+				inSampleSize = Math.round(srcHeight / destHeight);
+			} else {
+				inSampleSize = Math.round(srcWidth / destWidth);
+			}
+		}
+		
+		options = new BitmapFactory.Options();
+		options.inSampleSize = inSampleSize;
+		
+		Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+		return new BitmapDrawable(a.getResources(), bitmap);
 	}
 
 }

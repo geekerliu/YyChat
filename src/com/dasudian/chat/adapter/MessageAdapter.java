@@ -3,15 +3,19 @@ package com.dasudian.chat.adapter;
 import java.util.LinkedList;
 import java.util.List;
 
+import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.dasudian.chat.DsdMessage;
@@ -25,9 +29,11 @@ public class MessageAdapter extends BaseAdapter {
 	// 保存消息的链表
 	public List<DsdMessage> msgList = new LinkedList<DsdMessage>();
 	private LayoutInflater inflater;
+	private Activity activity;
 
-	public MessageAdapter(Context context) {
-		inflater = LayoutInflater.from(context);
+	public MessageAdapter(Context context, Activity activity) {
+		this.inflater = LayoutInflater.from(context);
+		this.activity = activity;
 	}
 
 	@Override
@@ -144,6 +150,7 @@ public class MessageAdapter extends BaseAdapter {
 			if (bitmap != null) {
 				Log.d(TAG, "从cache中读取图片");
 				holder.iv_image.setImageBitmap(bitmap);
+				clickTOShowBigImage(holder.iv_image, message);
 			} else {
 				new AsyncTask<Object, Void, Bitmap>() {
 
@@ -160,15 +167,47 @@ public class MessageAdapter extends BaseAdapter {
 							ImageCache.getInstance().put(
 									message.getImagePath(), image);
 							holder.iv_image.setImageBitmap(image);
+							clickTOShowBigImage(holder.iv_image, message);
 						}
 					}
 
 				}.execute();
 			}
+			
 			break;
 		default:
 			break;
 		}
+	}
+	
+	/**
+	 * 点击图片查看大图
+	 * @param image
+	 * @param message
+	 */
+	private void clickTOShowBigImage(ImageView image, final DsdMessage message) {
+		image.setOnClickListener(new OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				ImageView image = new ImageView(activity);
+				final Dialog dialog = new Dialog(activity,
+						android.R.style.Theme_NoTitleBar_Fullscreen);
+				image.setOnClickListener(new OnClickListener() {
+					
+					@Override
+					public void onClick(View v) {
+						dialog.dismiss();
+					}
+				});
+				image.setImageDrawable(ImageSizeUtil.getScaledBitmapDrawable(
+						activity, message.getImagePath()));
+				dialog.addContentView(image, new RelativeLayout.LayoutParams(
+			            ViewGroup.LayoutParams.MATCH_PARENT, 
+			            ViewGroup.LayoutParams.MATCH_PARENT));
+				dialog.show();
+			}
+		});
 	}
 
 	class ViewHolder {
