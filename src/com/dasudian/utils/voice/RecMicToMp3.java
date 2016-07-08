@@ -207,6 +207,7 @@ public class RecMicToMp3 {
 	public void discard() {
 		stop();
 		// delete the file
+		Log.d(TAG, "delete file:" + mFilePath);
 		File file = new File(mFilePath);
 		file.delete();
 	}

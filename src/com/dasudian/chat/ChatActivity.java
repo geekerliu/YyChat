@@ -62,11 +62,13 @@ public class ChatActivity extends Activity implements OnClickListener {
 	private View recordingContainer;
 	private AudioPlayer audioPlayer = new AudioPlayer();
 	private VoiceRecoder voiceRecoder;
+	private String toChatName;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_chat);
+		toChatName = getIntent().getStringExtra("name");
 		initView();
 	}
 
@@ -102,7 +104,8 @@ public class ChatActivity extends Activity implements OnClickListener {
 		buttonSetModeVoice = (Button) findViewById(R.id.btn_set_mode_voice);
 		recordingContainer = findViewById(R.id.view_talk);
 		listView = (ListView) findViewById(R.id.lv_chat);
-		adapter = new MessageAdapter(this, this);
+		Log.d(TAG, "toChatName = " + toChatName);
+		adapter = new MessageAdapter(this, this, toChatName);
 		listView.setAdapter(adapter);
 
 		editTextContent.setOnClickListener(new OnClickListener() {
@@ -158,22 +161,22 @@ public class ChatActivity extends Activity implements OnClickListener {
 					return false;
 				}
 				v.setPressed(true);
-				
-				// TODO 如果此时正在播放语音，先停止语音播放
+
+				// 如果此时正在播放语音，先停止语音播放
 				if (audioPlayer != null) {
 					audioPlayer.stop();
 				}
-				
+
 				// 显示说话的布局
 				recordingContainer.setVisibility(View.VISIBLE);
 				recordingHint.setText("手指上滑，取消发送");
 				recordingHint.setBackgroundColor(Color.TRANSPARENT);
-				
-				// TODO 开始录音
+
+				// 开始录音
 				Log.d(TAG, "voiceRecoder.start()");
 				voiceRecoder = new VoiceRecoder("dasudian", ChatActivity.this);
 				voiceRecoder.start();
-				
+
 				return true;
 			case MotionEvent.ACTION_MOVE:
 				if (event.getY() < 0) {
@@ -193,22 +196,23 @@ public class ChatActivity extends Activity implements OnClickListener {
 				v.setPressed(false);
 				recordingContainer.setVisibility(View.INVISIBLE);
 				if (event.getY() < 0) {
-					// TODO 丢弃这次录音
+					// 丢弃这次录音
 					if (voiceRecoder != null) {
 						Log.d(TAG, "voiceRecoder.discard()");
 						voiceRecoder.discard();
 					}
 				} else {
-					// TODO 停止录音并发送录音文件
+					// 停止录音并发送录音文件
 					if (voiceRecoder != null) {
 						Log.d(TAG, "voiceRecoder.stop()");
 						voiceRecoder.stop();
+						sendVoice(voiceRecoder.getVoiceFilePath("name"));
 					}
 				}
 				return true;
 			default:
 				recordingContainer.setVisibility(View.INVISIBLE);
-				// TODO 丢弃这次录音
+				// 丢弃这次录音
 				if (voiceRecoder != null) {
 					Log.d(TAG, "voiceRecoder.discard()");
 					voiceRecoder.discard();
@@ -359,6 +363,23 @@ public class ChatActivity extends Activity implements OnClickListener {
 		adapter.msgList.add(message);
 		DsdMessage message1 = DsdMessage.createImageMessage(
 				DsdMessage.MESSAGE_TYPE_RECV_IMAGE, filePath);
+		adapter.msgList.add(message1);
+		listView.setAdapter(adapter);
+		adapter.notifyDataSetChanged();
+		listView.setSelection(listView.getCount() - 1);
+	}
+
+	/**
+	 * 发送语音
+	 * @param filePath
+	 */
+	private void sendVoice(String filePath) {
+		Log.d(TAG, "sendVoice :" + filePath);
+		DsdMessage message = DsdMessage.createVoiceMessage(
+				DsdMessage.MESSAGE_TYPE_SEND_VOICE, filePath);
+		adapter.msgList.add(message);
+		DsdMessage message1 = DsdMessage.createVoiceMessage(
+				DsdMessage.MESSAGE_TYPE_RECV_VOICE, filePath);
 		adapter.msgList.add(message1);
 		listView.setAdapter(adapter);
 		adapter.notifyDataSetChanged();

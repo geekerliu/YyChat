@@ -10,6 +10,7 @@ import android.net.Uri;
 public class AudioPlayer {
 
 	private MediaPlayer mPlayer;
+	private boolean isPlaying = false;
 
 	public void stop() {
 		if (mPlayer != null) {
